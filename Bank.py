@@ -1,39 +1,40 @@
-
 n = int(input("Enter number of transactions: "))
 
-balances = {}
-total_deposit = 0
-total_withdrawal = 0
+balance = {}
+deposit = 0
+withdraw = 0
 
 for i in range(n):
-    print(f"\nTransaction {i+1}")
     acc = input("Account Number: ")
-    t = input("Type (Deposit/Withdrawal): ").lower()
-    amount = float(input("Amount: "))
+    t = input("Type (Deposit/Withdrawal): ")
+    amt = int(input("Amount: "))
 
-    if acc not in balances:
-        balances[acc] = 0
+    if acc not in balance:
+        balance[acc] = 0
 
-    if t == "deposit":
-        balances[acc] += amount
-        total_deposit += amount
+    if t == "Deposit":
+        balance[acc] = balance[acc] + amt
+        deposit = deposit + amt
+    else:
+        balance[acc] = balance[acc] - amt
+        withdraw = withdraw + amt
 
-    elif t == "withdrawal":
-        balances[acc] -= amount
-        total_withdrawal += amount
+        if amt > 10000:
+            print("Suspicious Withdrawal:", acc)
 
-        if amount > 10000:
-            print("Suspicious Withdrawal:", acc, "-", amount)
+print("\nTotal Deposit =", deposit)
+print("Total Withdrawal =", withdraw)
 
+maxbal = -1
+accno = ""
 
-highest_account = max(balances, key=balances.get)
+for i in balance:
+    if balance[i] > maxbal:
+        maxbal = balance[i]
+        accno = i
 
-print("\n------ REPORT ------")
-print("Total Deposits:", total_deposit)
-print("Total Withdrawals:", total_withdrawal)
-print("Highest Balance Account:", highest_account)
-print("Balance:", balances[highest_account])
+print("Highest Balance Account =", accno)
 
 print("\nFinal Balances")
-for acc, bal in balances.items():
-    print(acc, ":", bal)
+for i in balance:
+    print(i, "=", balance[i])
