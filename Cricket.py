@@ -1,46 +1,39 @@
-n = int(input("Enter number of players: "))
+name = ["Virat", "Rohit", "Bumrah"]
 
-name = []
-runs = []
-balls = []
-wickets = []
+runs = [80, 60, 20]
+balls = [50, 30, 18]
+wickets = [1, 0, 5]
+
 sr = []
 
-for i in range(n):
-    name.append(input("Name: "))
-    runs.append(int(input("Runs: ")))
-    balls.append(int(input("Balls: ")))
-    wickets.append(int(input("Wickets: ")))
-
+for i in range(len(name)):
     strike = (runs[i] / balls[i]) * 100
     sr.append(strike)
 
-print("\nStrike Rates")
-for i in range(n):
-    print(name[i], "=", sr[i])
+print("Strike Rates")
+for i in range(len(name)):
+    print(name[i], "=", round(sr[i], 2))
 
-# Orange Cap
 m = max(runs)
 index = runs.index(m)
-print("Orange Cap =", name[index])
+print("\nOrange Cap =", name[index])
 
-# Purple Cap
 m = max(wickets)
 index = wickets.index(m)
 print("Purple Cap =", name[index])
 
-print("\nStrike Rate Above 150")
-for i in range(n):
+print("\nPlayers with Strike Rate above 150")
+for i in range(len(name)):
     if sr[i] > 150:
         print(name[i])
 
 print("\nRanking by Runs")
 
-for i in range(n):
-    for j in range(i + 1, n):
+for i in range(len(runs)):
+    for j in range(i + 1, len(runs)):
         if runs[i] < runs[j]:
             runs[i], runs[j] = runs[j], runs[i]
             name[i], name[j] = name[j], name[i]
 
-for i in range(n):
+for i in range(len(name)):
     print(i + 1, ".", name[i], "-", runs[i])
