@@ -6,27 +6,27 @@ roads = [
 ]
 
 for road in roads:
-    road["score"] = road["vehicle"] + road["accident"]*100 - road["speed"]
+    road["score"] = road["vehicle"] + road["accident"] * 100 - road["speed"]
 
-print("scores")
+print("Congestion Score")
 for road in roads:
-    print(road["id"],road["score"])
+    print(road["id"], road["city"], road["score"])
 
 for i in range(len(roads)):
-    for j in range(i+1,len(roads)):
+    for j in range(i + 1, len(roads)):
         if roads[i]["score"] < roads[j]["score"]:
-            roads[i],roads[j] = roads[j],roads[i]
+            roads[i], roads[j] = roads[j], roads[i]
 
-print("rank")
-count = 1
+print("\nRanking")
+rank = 1
 for road in roads:
-    print(count,road["id"])
-    count = count + 1
+    print(rank, road["id"], road["city"], road["score"])
+    rank = rank + 1
 
-print("alerts")
+print("\nTraffic Alert")
 for road in roads:
     if road["score"] > 1000:
-        print(road["id"])
+        print(road["id"], "Heavy Traffic")
 
 city = {}
 
@@ -36,25 +36,25 @@ for road in roads:
     else:
         city[road["city"]] = road["score"]
 
-print("city")
-for i in city:
-    print(i,city[i])
+print("\nCity Report")
+for name in city:
+    print(name, city[name])
 
-print("top 5")
+print("\nTop 5 Roads")
 for i in range(len(roads)):
     if i < 5:
-        print(roads[i]["id"],roads[i]["score"])
+        print(roads[i]["id"], roads[i]["city"], roads[i]["score"])
 
 file = open("traffic.txt","w")
 
 for road in roads:
-    file.write(road["id"]+" "+str(road["score"])+"\n")
+    file.write(road["id"] + " " + road["city"] + " " + str(road["score"]) + "\n")
 
 file.close()
 
-file = open("traffic.txt","r")
+print("\nReading File")
 
-print("file")
+file = open("traffic.txt","r")
 
 for line in file:
     print(line.strip())
