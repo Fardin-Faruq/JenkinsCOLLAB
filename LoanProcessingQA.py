@@ -1,98 +1,154 @@
-from LoanProcessingSystem import calculate_loan
+"""
+Banking Loan Approval System - QA Program
+LoanProcessingQA.py
+
+Run standalone:      python3 LoanProcessingQA.py
+Run with unittest:   python3 -m unittest LoanProcessingQA -v
+Run with pytest:     pytest LoanProcessingQA.py -v
+"""
+import unittest
+from LoanProcessingSystem import LoanProcessingSystem, LoanValidationError
 
 
-def test_minimum_age():
-    result = calculate_loan("C001", 18, 30000, 0, 750, "Salaried", 200000, 5)
-    assert result["status"] == "Approved"
-    print("Minimum age test: PASS")
+def make_loan(**overrides):
+    defaults = dict(
+        customer_id="CUST001",
+        age=30,
+        monthly_salary=60000,
+        existing_loan_amount=100000,
+        credit_score=780,
+        employment_type="SALARIED",
+        requested_loan_amount=500000,
+        loan_tenure_months=60,
+    )
+    defaults.update(overrides)
+    return LoanProcessingSystem(**defaults)
 
 
-def test_maximum_age():
-    result = calculate_loan("C002", 65, 30000, 0, 750, "Salaried", 200000, 5)
-    assert result["status"] == "Approved"
-    print("Maximum age test: PASS")
+class TestLoanProcessingSystem(unittest.TestCase):
+
+    # ---- age boundaries ----
+    def test_minimum_age_boundary_approved(self):
+        loan = make_loan(age=21)
+        result = loan.process_application()
+        self.assertNotIn("Age must be between 21 and 60", result["reasons"])
+
+    def test_maximum_age_boundary_approved(self):
+        loan = make_loan(age=60)
+        result = loan.process_application()
+        self.assertNotIn("Age must be between 21 and 60", result["reasons"])
+
+    def test_below_minimum_age_rejected(self):
+        loan = make_loan(age=20)
+        result = loan.process_application()
+        self.assertEqual(result["status"], "REJECTED")
+
+    def test_above_maximum_age_rejected(self):
+        loan = make_loan(age=61)
+        result = loan.process_application()
+        self.assertEqual(result["status"], "REJECTED")
+
+    # ---- invalid salary ----
+    def test_zero_salary_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(monthly_salary=0)
+
+    def test_negative_salary_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(monthly_salary=-5000)
+
+    def test_below_minimum_salary_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(monthly_salary=5000)
+
+    # ---- credit score ----
+    def test_poor_credit_score_rejected(self):
+        loan = make_loan(credit_score=500)
+        result = loan.process_application()
+        self.assertEqual(result["status"], "REJECTED")
+        self.assertTrue(any("Credit score" in r for r in result["reasons"]))
+
+    def test_high_credit_score_gets_rate_discount(self):
+        loan = make_loan(credit_score=800)
+        rate = loan.calculate_interest_rate()
+        self.assertEqual(rate, 7.5)  # 8.5 base - 1.0 for excellent score
+
+    # ---- existing loan threshold ----
+    def test_existing_loan_exceeding_threshold_rejected(self):
+        loan = make_loan(existing_loan_amount=3000000)
+        result = loan.process_application()
+        self.assertEqual(result["status"], "REJECTED")
+        self.assertTrue(any("threshold" in r for r in result["reasons"]))
+
+    # ---- debt to income ratio ----
+    def test_high_dti_ratio_rejected(self):
+        loan = make_loan(monthly_salary=15000, existing_loan_amount=1900000)
+        result = loan.process_application()
+        self.assertGreater(result["dti_ratio"], 50.0)
+        self.assertEqual(result["status"], "REJECTED")
+
+    # ---- employment categories ----
+    def test_salaried_employment_rate(self):
+        loan = make_loan(employment_type="SALARIED", credit_score=700)
+        self.assertEqual(loan.calculate_interest_rate(), 8.5)
+
+    def test_self_employed_employment_rate(self):
+        loan = make_loan(employment_type="SELF_EMPLOYED", credit_score=700)
+        self.assertEqual(loan.calculate_interest_rate(), 10.5)
+
+    def test_business_employment_rate(self):
+        loan = make_loan(employment_type="BUSINESS", credit_score=700)
+        self.assertEqual(loan.calculate_interest_rate(), 11.0)
+
+    def test_invalid_employment_type_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(employment_type="FREELANCER")
+
+    # ---- boundary loan amounts ----
+    def test_requested_amount_equal_to_eligible_approved(self):
+        loan = make_loan(monthly_salary=60000, existing_loan_amount=0, requested_loan_amount=3600000)
+        result = loan.process_application()
+        self.assertEqual(result["eligible_amount"], 3600000)
+        self.assertNotIn("Requested amount exceeds eligible loan amount", result["reasons"])
+
+    def test_requested_amount_over_eligible_rejected(self):
+        loan = make_loan(monthly_salary=60000, existing_loan_amount=0, requested_loan_amount=3600001)
+        result = loan.process_application()
+        self.assertEqual(result["status"], "REJECTED")
+
+    # ---- EMI calculation accuracy ----
+    def test_emi_calculation_known_value(self):
+        loan = make_loan()
+        emi = loan.calculate_emi(principal=500000, annual_rate=8.5, tenure_months=60)
+        self.assertAlmostEqual(emi, 10258.28, delta=0.5)
+
+    def test_emi_zero_interest(self):
+        loan = make_loan()
+        emi = loan.calculate_emi(principal=120000, annual_rate=0, tenure_months=12)
+        self.assertEqual(emi, 10000.0)
+
+    # ---- invalid input handling ----
+    def test_non_numeric_age_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(age="thirty")
+
+    def test_non_integer_tenure_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(loan_tenure_months=60.5)
+
+    def test_negative_existing_loan_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(existing_loan_amount=-1)
+
+    # ---- exception handling ----
+    def test_zero_tenure_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(loan_tenure_months=0)
+
+    def test_credit_score_out_of_range_raises(self):
+        with self.assertRaises(LoanValidationError):
+            make_loan(credit_score=1000)
 
 
-def test_invalid_salary():
-    try:
-        calculate_loan("C003", 30, -1000, 0, 750, "Salaried", 200000, 5)
-        print("Invalid salary test: FAIL")
-    except ValueError:
-        print("Invalid salary test: PASS")
-
-
-def test_poor_credit_score():
-    result = calculate_loan("C004", 30, 30000, 0, 500, "Salaried", 200000, 5)
-    assert result["status"] == "Rejected"
-    print("Poor credit score test: PASS")
-
-
-def test_existing_loan_threshold():
-    result = calculate_loan("C005", 30, 30000, 200000, 750, "Salaried", 100000, 5)
-    assert result["status"] == "Rejected"
-    print("Existing loan threshold test: PASS")
-
-
-def test_high_dti():
-    result = calculate_loan("C006", 30, 30000, 150000, 750, "Salaried", 100000, 5)
-    assert result["status"] == "Rejected"
-    print("High DTI test: PASS")
-
-
-def test_employment_categories():
-    salaried = calculate_loan("C007", 30, 30000, 0, 750, "Salaried", 200000, 5)
-    self_employed = calculate_loan("C008", 30, 30000, 0, 750, "Self-Employed", 200000, 5)
-    business = calculate_loan("C009", 30, 30000, 0, 750, "Business", 200000, 5)
-
-    assert salaried["interest_rate"] == 7.5
-    assert self_employed["interest_rate"] == 8.5
-    assert business["interest_rate"] == 9.5
-
-    print("Employment category test: PASS")
-
-
-def test_boundary_loan_amount():
-    result = calculate_loan("C010", 30, 30000, 0, 750, "Salaried", 10000, 5)
-    assert result["status"] == "Approved"
-    print("Boundary loan amount test: PASS")
-
-
-def test_emi_calculation():
-    result = calculate_loan("C011", 30, 30000, 0, 750, "Salaried", 200000, 5)
-
-    rate = 7.5 / (12 * 100)
-    months = 60
-
-    expected_emi = 200000 * rate * (1 + rate) ** months / ((1 + rate) ** months - 1)
-
-    assert abs(result["emi"] - expected_emi) < 0.01
-    print("EMI calculation test: PASS")
-
-
-def test_invalid_input():
-    try:
-        calculate_loan("C012", 17, 30000, 0, 750, "Salaried", 200000, 5)
-        print("Invalid input test: FAIL")
-    except ValueError:
-        print("Invalid input test: PASS")
-
-
-def test_exception_handling():
-    try:
-        calculate_loan("C013", 30, 30000, 0, 750, "Unknown", 200000, 5)
-        print("Exception handling test: FAIL")
-    except ValueError:
-        print("Exception handling test: PASS")
-
-
-test_minimum_age()
-test_maximum_age()
-test_invalid_salary()
-test_poor_credit_score()
-test_existing_loan_threshold()
-test_high_dti()
-test_employment_categories()
-test_boundary_loan_amount()
-test_emi_calculation()
-test_invalid_input()
-test_exception_handling()
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
